@@ -1,29 +1,27 @@
-from flask import Flask
+
+from flask import Flask, request
+import mysql.connector
+
 app = Flask(__name__)
-complaints=[]
+db = mysql.connector.connect(host="localhost", user="root", password="", database="complaint_db")
+cursor = db.cursor()
+
+# Create tables if not exists
+cursor.execute("CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100))")
+cursor.execute("CREATE TABLE IF NOT EXISTS complaints (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, msg TEXT, status VARCHAR(20) DEFAULT 'pending', FOREIGN KEY(user_id) REFERENCES users(id))")
 
 @app.route('/')
 def home():
-    html="<h2>Complaint System</h2><form action='/add' method='post'>Name:<br><input name='name'><br>Complaint:<br><textarea name='msg'></textarea><br><button>Submit</button></form><br><a href='/view'>View Complaints</a><br><br>".replace("<br>","\n")
-    for c in complaints:
-        html+=f"<p><b>{c[0]}</b>: {c[1]}</p>"
-    return html
+    return "<h2>Complaint System</h2><form action='/add' method='post'>Name:<br><input name='name'><br>Complaint:<br><textarea name='msg'></textarea><br><button>Submit</button></form>"
 
 @app.route('/add', methods=['POST'])
 def add():
-    from flask import request
-    complaints.append((request.form['name'], request.form['msg']))
-    return "<h3>Submitted!</h3><a href='/'>Back</a> | <a href='/view'>View</a>"
+    name = request.form['name']
+    msg = request.form['msg']
+    cursor.execute("INSERT INTO users (name) VALUES (%s)", (name,))
+    user_id = cursor.lastrowid
+    cursor.execute("INSERT INTO complaints (user_id, msg) VALUES (%s, %s)", (user_id, msg))
+    db.commit()
+    return "<h3>Submitted to MySQL!</h3><a href='/'>Back</a>"
 
-@app.route('/view')
-def view():
-    s="<h2>All Complaints</h2>"
-    if not complaints:
-        s+="<p>No complaints</p>"
-    for i,c in enumerate(complaints):
-        s+=f"<p>{i+1}. {c[0]} - {c[1]}</p>"
-    s+="<br><a href='/'>Home</a>"
-    return s
-
-if __name__=='__main__':
-    app.run(host='0.0.0.0', port=5000)
+app.run()
